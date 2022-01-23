@@ -40,7 +40,10 @@ Client
 
 .. autoclass:: Client
     :members:
-    :exclude-members: fetch_guilds
+    :exclude-members: fetch_guilds, event
+
+    .. automethod:: Client.event()
+        :decorator:
 
     .. automethod:: Client.fetch_guilds
         :async-for:
@@ -98,6 +101,7 @@ VoiceClient
 
 .. autoclass:: VoiceClient()
     :members:
+    :exclude-members: connect, on_voice_state_update, on_voice_server_update
 
 VoiceProtocol
 ~~~~~~~~~~~~~~~
@@ -294,14 +298,28 @@ to handle it, which defaults to print a traceback and ignoring the exception.
     :param kwargs: The keyword arguments for the event that raised the
         exception.
 
+.. function:: on_socket_event_type(event_type)
+
+    Called whenever a websocket event is received from the WebSocket.
+
+    This is mainly useful for logging how many events you are receiving
+    from the Discord gateway.
+
+    .. versionadded:: 2.0
+
+    :param event_type: The event type from Discord that is received, e.g. ``'READY'``.
+    :type event_type: :class:`str`
+
 .. function:: on_socket_raw_receive(msg)
 
-    Called whenever a message is received from the WebSocket, before
-    it's processed. This event is always dispatched when a message is
-    received and the passed data is not processed in any way.
+    Called whenever a message is completely received from the WebSocket, before
+    it's processed and parsed. This event is always dispatched when a
+    complete message is received and the passed data is not parsed in any way.
 
     This is only really useful for grabbing the WebSocket stream and
     debugging purposes.
+
+    This requires setting the ``enable_debug_events`` setting in the :class:`Client`.
 
     .. note::
 
@@ -309,9 +327,7 @@ to handle it, which defaults to print a traceback and ignoring the exception.
         WebSocket. The voice WebSocket will not trigger this event.
 
     :param msg: The message passed in from the WebSocket library.
-                Could be :class:`bytes` for a binary message or :class:`str`
-                for a regular message.
-    :type msg: Union[:class:`bytes`, :class:`str`]
+    :type msg: :class:`str`
 
 .. function:: on_socket_raw_send(payload)
 
@@ -321,6 +337,8 @@ to handle it, which defaults to print a traceback and ignoring the exception.
 
     This is only really useful for grabbing the WebSocket stream and
     debugging purposes.
+
+    This requires setting the ``enable_debug_events`` setting in the :class:`Client`.
 
     .. note::
 
@@ -597,7 +615,13 @@ to handle it, which defaults to print a traceback and ignoring the exception.
 
     Called when an interaction happened.
 
-    This currently happens due to slash command invocations.
+    This currently happens due to slash command invocations or components being used.
+
+    .. warning::
+
+        This is a low level function that is not generally meant to be used.
+        If you are working with components, consider using the callbacks associated
+        with the :class:`~discord.ui.View` instead as it provides a nicer user experience.
 
     .. versionadded:: 2.0
 
@@ -654,20 +678,127 @@ to handle it, which defaults to print a traceback and ignoring the exception.
     This requires :attr:`Intents.guilds` to be enabled.
 
     :param channel: The guild channel that had its pins updated.
-    :type channel: :class:`abc.GuildChannel`
+    :type channel: Union[:class:`abc.GuildChannel`, :class:`Thread`]
     :param last_pin: The latest message that was pinned as an aware datetime in UTC. Could be ``None``.
     :type last_pin: Optional[:class:`datetime.datetime`]
 
-.. function:: on_guild_integrations_update(guild)
+.. function:: on_thread_join(thread)
 
-    .. versionadded:: 1.4
+    Called whenever a thread is joined or created. Note that from the API's perspective there is no way to
+    differentiate between a thread being created or the bot joining a thread.
+
+    Note that you can get the guild from :attr:`Thread.guild`.
+
+    This requires :attr:`Intents.guilds` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param thread: The thread that got joined.
+    :type thread: :class:`Thread`
+
+.. function:: on_thread_remove(thread)
+
+    Called whenever a thread is removed. This is different from a thread being deleted.
+
+    Note that you can get the guild from :attr:`Thread.guild`.
+
+    This requires :attr:`Intents.guilds` to be enabled.
+
+    .. warning::
+
+        Due to technical limitations, this event might not be called
+        as soon as one expects. Since the library tracks thread membership
+        locally, the API only sends updated thread membership status upon being
+        synced by joining a thread.
+
+    .. versionadded:: 2.0
+
+    :param thread: The thread that got removed.
+    :type thread: :class:`Thread`
+
+.. function:: on_thread_delete(thread)
+
+    Called whenever a thread is deleted.
+
+    Note that you can get the guild from :attr:`Thread.guild`.
+
+    This requires :attr:`Intents.guilds` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param thread: The thread that got deleted.
+    :type thread: :class:`Thread`
+
+.. function:: on_thread_member_join(member)
+              on_thread_member_remove(member)
+
+    Called when a :class:`ThreadMember` leaves or joins a :class:`Thread`.
+
+    You can get the thread a member belongs in by accessing :attr:`ThreadMember.thread`.
+
+    This requires :attr:`Intents.members` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param member: The member who joined or left.
+    :type member: :class:`ThreadMember`
+
+.. function:: on_thread_update(before, after)
+
+    Called whenever a thread is updated.
+
+    This requires :attr:`Intents.guilds` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param before: The updated thread's old info.
+    :type before: :class:`Thread`
+    :param after: The updated thread's new info.
+    :type after: :class:`Thread`
+
+.. function:: on_guild_integrations_update(guild)
 
     Called whenever an integration is created, modified, or removed from a guild.
 
     This requires :attr:`Intents.integrations` to be enabled.
 
+    .. versionadded:: 1.4
+
     :param guild: The guild that had its integrations updated.
     :type guild: :class:`Guild`
+
+.. function:: on_integration_create(integration)
+
+    Called when an integration is created.
+
+    This requires :attr:`Intents.integrations` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param integration: The integration that was created.
+    :type integration: :class:`Integration`
+
+.. function:: on_integration_update(integration)
+
+    Called when an integration is updated.
+
+    This requires :attr:`Intents.integrations` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param integration: The integration that was created.
+    :type integration: :class:`Integration`
+
+.. function:: on_raw_integration_delete(payload)
+
+    Called when an integration is deleted.
+
+    This requires :attr:`Intents.integrations` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param payload: The raw event payload data.
+    :type payload: :class:`RawIntegrationDeleteEvent`
 
 .. function:: on_webhooks_update(channel)
 
@@ -694,13 +825,29 @@ to handle it, which defaults to print a traceback and ignoring the exception.
 
     This is called when one or more of the following things change:
 
-    - status
-    - activity
     - nickname
     - roles
     - pending
 
     This requires :attr:`Intents.members` to be enabled.
+
+    :param before: The updated member's old info.
+    :type before: :class:`Member`
+    :param after: The updated member's updated info.
+    :type after: :class:`Member`
+
+.. function:: on_presence_update(before, after)
+
+    Called when a :class:`Member` updates their presence.
+
+    This is called when one or more of the following things change:
+
+    - status
+    - activity
+
+    This requires :attr:`Intents.presences` and :attr:`Intents.members` to be enabled.
+
+    .. versionadded:: 2.0
 
     :param before: The updated member's old info.
     :type before: :class:`Member`
@@ -796,7 +943,7 @@ to handle it, which defaults to print a traceback and ignoring the exception.
 
     Called when a :class:`Guild` adds or removes :class:`Emoji`.
 
-    This requires :attr:`Intents.emojis` to be enabled.
+    This requires :attr:`Intents.emojis_and_stickers` to be enabled.
 
     :param guild: The guild who got their emojis updated.
     :type guild: :class:`Guild`
@@ -804,6 +951,21 @@ to handle it, which defaults to print a traceback and ignoring the exception.
     :type before: Sequence[:class:`Emoji`]
     :param after: A list of emojis after the update.
     :type after: Sequence[:class:`Emoji`]
+
+.. function:: on_guild_stickers_update(guild, before, after)
+
+    Called when a :class:`Guild` updates its stickers.
+
+    This requires :attr:`Intents.emojis_and_stickers` to be enabled.
+
+    .. versionadded:: 2.0
+
+    :param guild: The guild who got their stickers updated.
+    :type guild: :class:`Guild`
+    :param before: A list of stickers before the update.
+    :type before: Sequence[:class:`GuildSticker`]
+    :param after: A list of stickers after the update.
+    :type after: Sequence[:class:`GuildSticker`]
 
 .. function:: on_guild_available(guild)
               on_guild_unavailable(guild)
@@ -821,8 +983,8 @@ to handle it, which defaults to print a traceback and ignoring the exception.
 
     The following, but not limited to, examples illustrate when this event is called:
 
-    - A member joins a voice channel.
-    - A member leaves a voice channel.
+    - A member joins a voice or stage channel.
+    - A member leaves a voice or stage channel.
     - A member is muted or deafened by their own accord.
     - A member is muted or deafened by a guild administrator.
 
@@ -834,6 +996,32 @@ to handle it, which defaults to print a traceback and ignoring the exception.
     :type before: :class:`VoiceState`
     :param after: The voice state after the changes.
     :type after: :class:`VoiceState`
+
+.. function:: on_stage_instance_create(stage_instance)
+              on_stage_instance_delete(stage_instance)
+
+    Called when a :class:`StageInstance` is created or deleted for a :class:`StageChannel`.
+
+    .. versionadded:: 2.0
+
+    :param stage_instance: The stage instance that was created or deleted.
+    :type stage_instance: :class:`StageInstance`
+
+.. function:: on_stage_instance_update(before, after)
+
+    Called when a :class:`StageInstance` is updated.
+
+    The following, but not limited to, examples illustrate when this event is called:
+
+    - The topic is changed.
+    - The privacy level is changed.
+
+    .. versionadded:: 2.0
+
+    :param before: The stage instance before the update.
+    :type before: :class:`StageInstance`
+    :param after: The stage instance after the update.
+    :type after: :class:`StageInstance`
 
 .. function:: on_member_ban(guild, user)
 
@@ -933,6 +1121,8 @@ Utility Functions
 
 .. autofunction:: discord.utils.utcnow
 
+.. autofunction:: discord.utils.format_dt
+
 .. autofunction:: discord.utils.as_chunks
 
 .. _discord-api-enums:
@@ -979,6 +1169,24 @@ of :class:`enum.Enum`.
 
         .. versionadded:: 1.7
 
+    .. attribute:: news_thread
+
+        A news thread
+
+        .. versionadded:: 2.0
+
+    .. attribute:: public_thread
+
+        A public thread
+
+        .. versionadded:: 2.0
+
+    .. attribute:: private_thread
+
+        A private thread
+
+        .. versionadded:: 2.0
+
 .. class:: MessageType
 
     Specifies the type of :class:`Message`. This is used to denote if a message
@@ -998,12 +1206,12 @@ of :class:`enum.Enum`.
         The default message type. This is the same as regular messages.
     .. attribute:: recipient_add
 
-        The system message when a recipient is added to a group private
-        message, i.e. a private channel of type :attr:`ChannelType.group`.
+        The system message when a user is added to a group private
+        message or a thread.
     .. attribute:: recipient_remove
 
-        The system message when a recipient is removed from a group private
-        message, i.e. a private channel of type :attr:`ChannelType.group`.
+        The system message when a user is removed from a group private
+        message or a thread.
     .. attribute:: call
 
         The system message denoting call state, e.g. missed call, started call,
@@ -1070,9 +1278,17 @@ of :class:`enum.Enum`.
         Discovery requirements for 3 weeks in a row.
 
         .. versionadded:: 1.7
+    .. attribute:: thread_created
+
+        The system message denoting that a thread has been created. This is only
+        sent if the thread has been created from an older message. The period of time
+        required for a message to be considered old cannot be relied upon and is up to
+        Discord.
+
+        .. versionadded:: 2.0
     .. attribute:: reply
 
-        The message type denoting that the author is replying to a message.
+        The system message denoting that the author is replying to a message.
 
         .. versionadded:: 2.0
     .. attribute:: application_command
@@ -1083,6 +1299,12 @@ of :class:`enum.Enum`.
     .. attribute:: guild_invite_reminder
 
         The system message sent as a reminder to invite people to the guild.
+
+        .. versionadded:: 2.0
+    .. attribute:: thread_starter_message
+
+        The system message denoting the message in the thread that is the one that started the
+        thread's conversation topic.
 
         .. versionadded:: 2.0
 
@@ -1128,7 +1350,7 @@ of :class:`enum.Enum`.
         The user is a system user (i.e. represents Discord officially).
     .. attribute:: has_unread_urgent_messages
 
-        The user has an unready system message.
+        The user has an unread system message.
     .. attribute:: bug_hunter_level_2
 
         The user is a Bug Hunter Level 2.
@@ -1265,12 +1487,18 @@ of :class:`enum.Enum`.
     .. attribute:: grey
 
         An alias for :attr:`secondary`.
+    .. attribute:: gray
+
+        An alias for :attr:`secondary`.
     .. attribute:: green
 
         An alias for :attr:`success`.
     .. attribute:: red
 
         An alias for :attr:`danger`.
+    .. attribute:: url
+
+        An alias for :attr:`link`.
 
 .. class:: VoiceRegion
 
@@ -1362,6 +1590,8 @@ of :class:`enum.Enum`.
 
     .. container:: operations
 
+        .. versionadded:: 2.0
+
         .. describe:: x == y
 
             Checks if two verification levels are equal.
@@ -1404,6 +1634,29 @@ of :class:`enum.Enum`.
 
     Specifies whether a :class:`Guild` has notifications on for all messages or mentions only by default.
 
+    .. container:: operations
+
+        .. versionadded:: 2.0
+
+        .. describe:: x == y
+
+            Checks if two notification levels are equal.
+        .. describe:: x != y
+
+            Checks if two notification levels are not equal.
+        .. describe:: x > y
+
+            Checks if a notification level is higher than another.
+        .. describe:: x < y
+
+            Checks if a notification level is lower than another.
+        .. describe:: x >= y
+
+            Checks if a notification level is higher or equal to another.
+        .. describe:: x <= y
+
+            Checks if a notification level is lower or equal to another.
+
     .. attribute:: all_messages
 
         Members receive notifications for every message regardless of them being mentioned.
@@ -1418,6 +1671,8 @@ of :class:`enum.Enum`.
     pornography or otherwise explicit content.
 
     .. container:: operations
+
+        .. versionadded:: 2.0
 
         .. describe:: x == y
 
@@ -1549,6 +1804,7 @@ of :class:`enum.Enum`.
         - :attr:`~AuditLogDiff.bitrate`
         - :attr:`~AuditLogDiff.rtc_region`
         - :attr:`~AuditLogDiff.video_quality_mode`
+        - :attr:`~AuditLogDiff.default_auto_archive_duration`
 
     .. attribute:: channel_delete
 
@@ -1678,7 +1934,7 @@ of :class:`enum.Enum`.
     .. attribute:: member_role_update
 
         A member's role has been updated. This triggers when a member
-        either gains a role or losses a role.
+        either gains a role or loses a role.
 
         When this is the action, the type of :attr:`~AuditLogEntry.target` is
         the :class:`Member` or :class:`User` who got the role.
@@ -1972,6 +2228,150 @@ of :class:`enum.Enum`.
 
         .. versionadded:: 1.3
 
+    .. attribute:: stage_instance_create
+
+        A stage instance was started.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`StageInstance` or :class:`Object` with the ID of the stage
+        instance which was created.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.topic`
+        - :attr:`~AuditLogDiff.privacy_level`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: stage_instance_update
+
+        A stage instance was updated.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`StageInstance` or :class:`Object` with the ID of the stage
+        instance which was updated.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.topic`
+        - :attr:`~AuditLogDiff.privacy_level`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: stage_instance_delete
+
+        A stage instance was ended.
+
+        .. versionadded:: 2.0
+
+    .. attribute:: sticker_create
+
+        A sticker was created.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`GuildSticker` or :class:`Object` with the ID of the sticker
+        which was updated.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.emoji`
+        - :attr:`~AuditLogDiff.type`
+        - :attr:`~AuditLogDiff.format_type`
+        - :attr:`~AuditLogDiff.description`
+        - :attr:`~AuditLogDiff.available`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: sticker_update
+
+        A sticker was updated.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`GuildSticker` or :class:`Object` with the ID of the sticker
+        which was updated.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.emoji`
+        - :attr:`~AuditLogDiff.type`
+        - :attr:`~AuditLogDiff.format_type`
+        - :attr:`~AuditLogDiff.description`
+        - :attr:`~AuditLogDiff.available`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: sticker_delete
+
+        A sticker was deleted.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`GuildSticker` or :class:`Object` with the ID of the sticker
+        which was updated.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.emoji`
+        - :attr:`~AuditLogDiff.type`
+        - :attr:`~AuditLogDiff.format_type`
+        - :attr:`~AuditLogDiff.description`
+        - :attr:`~AuditLogDiff.available`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: thread_create
+
+        A thread was created.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`Thread` or :class:`Object` with the ID of the thread which
+        was created.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.archived`
+        - :attr:`~AuditLogDiff.locked`
+        - :attr:`~AuditLogDiff.auto_archive_duration`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: thread_update
+
+        A thread was updated.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`Thread` or :class:`Object` with the ID of the thread which
+        was updated.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.archived`
+        - :attr:`~AuditLogDiff.locked`
+        - :attr:`~AuditLogDiff.auto_archive_duration`
+
+        .. versionadded:: 2.0
+
+    .. attribute:: thread_delete
+
+        A thread was deleted.
+
+        When this is the action, the type of :attr:`~AuditLogEntry.target` is
+        the :class:`Thread` or :class:`Object` with the ID of the thread which
+        was deleted.
+
+        Possible attributes for :class:`AuditLogDiff`:
+
+        - :attr:`~AuditLogDiff.name`
+        - :attr:`~AuditLogDiff.archived`
+        - :attr:`~AuditLogDiff.locked`
+        - :attr:`~AuditLogDiff.auto_archive_duration`
+
+        .. versionadded:: 2.0
+
 .. class:: AuditLogActionCategory
 
     Represents the category that the :class:`AuditLogAction` belongs to.
@@ -2018,6 +2418,12 @@ of :class:`enum.Enum`.
 
         Represents a webhook that is internally managed by Discord, used for following channels.
 
+    .. attribute:: application
+
+        Represents a webhook that is used for interactions or applications.
+
+        .. versionadded:: 2.0
+
 .. class:: ExpireBehaviour
 
     Represents the behaviour the :class:`Integration` should perform
@@ -2029,7 +2435,7 @@ of :class:`enum.Enum`.
 
     .. attribute:: remove_role
 
-        This will remove the :attr:`Integration.role` from the user
+        This will remove the :attr:`StreamIntegration.role` from the user
         when their subscription is finished.
 
     .. attribute:: kick
@@ -2065,6 +2471,20 @@ of :class:`enum.Enum`.
         See also :attr:`Colour.red`
 
 .. class:: StickerType
+
+    Represents the type of sticker.
+
+    .. versionadded:: 2.0
+
+    .. attribute:: standard
+
+        Represents a standard sticker that all Nitro users can use.
+
+    .. attribute:: guild
+
+        Represents a custom sticker created in a guild.
+
+.. class:: StickerFormatType
 
     Represents the type of sticker images.
 
@@ -2114,6 +2534,66 @@ of :class:`enum.Enum`.
 
         Represents full camera video quality.
 
+.. class:: StagePrivacyLevel
+
+    Represents a stage instance's privacy level.
+
+    .. versionadded:: 2.0
+
+    .. attribute:: public
+
+        The stage instance can be joined by external users.
+
+    .. attribute:: closed
+
+        The stage instance can only be joined by members of the guild.
+
+    .. attribute:: guild_only
+
+        Alias for :attr:`.closed`
+
+.. class:: NSFWLevel
+
+    Represents the NSFW level of a guild.
+
+    .. versionadded:: 2.0
+
+    .. container:: operations
+
+        .. describe:: x == y
+
+            Checks if two NSFW levels are equal.
+        .. describe:: x != y
+
+            Checks if two NSFW levels are not equal.
+        .. describe:: x > y
+
+            Checks if a NSFW level is higher than another.
+        .. describe:: x < y
+
+            Checks if a NSFW level is lower than another.
+        .. describe:: x >= y
+
+            Checks if a NSFW level is higher or equal to another.
+        .. describe:: x <= y
+
+            Checks if a NSFW level is lower or equal to another.
+
+    .. attribute:: default
+
+        The guild has not been categorised yet.
+
+    .. attribute:: explicit
+
+        The guild contains NSFW content.
+
+    .. attribute:: safe
+
+        The guild does not contain any NSFW content.
+
+    .. attribute:: age_restricted
+
+        The guild may contain NSFW content.
 
 Async Iterator
 ----------------
@@ -2496,21 +2976,15 @@ AuditLogDiff
 
     .. attribute:: type
 
-        The type of channel or channel permission overwrite.
+        The type of channel or sticker.
 
-        If the type is an :class:`int`, then it is a type of channel which can be either
-        ``0`` to indicate a text channel or ``1`` to indicate a voice channel.
-
-        If the type is a :class:`str`, then it is a type of permission overwrite which
-        can be either ``'role'`` or ``'member'``.
-
-        :type: Union[:class:`int`, :class:`str`]
+        :type: Union[:class:`ChannelType`, :class:`StickerType`]
 
     .. attribute:: topic
 
-        The topic of a :class:`TextChannel`.
+        The topic of a :class:`TextChannel` or :class:`StageChannel`.
 
-        See also :attr:`TextChannel.topic`.
+        See also :attr:`TextChannel.topic` or :attr:`StageChannel.topic`.
 
         :type: :class:`str`
 
@@ -2534,6 +3008,12 @@ AuditLogDiff
         decide what type of ID it is.
 
         :type: List[Tuple[target, :class:`PermissionOverwrite`]]
+
+    .. attribute:: privacy_level
+
+        The privacy level of the stage instance.
+
+        :type: :class:`StagePrivacyLevel`
 
     .. attribute:: roles
 
@@ -2704,6 +3184,64 @@ AuditLogDiff
         See also :attr:`VoiceChannel.video_quality_mode`.
 
         :type: :class:`VideoQualityMode`
+
+    .. attribute:: format_type
+
+        The format type of a sticker being changed.
+
+        See also :attr:`GuildSticker.format`
+
+        :type: :class:`StickerFormatType`
+
+    .. attribute:: emoji
+
+        The name of the emoji that represents a sticker being changed.
+
+        See also :attr:`GuildSticker.emoji`
+
+        :type: :class:`str`
+
+    .. attribute:: description
+
+        The description of a sticker being changed.
+
+        See also :attr:`GuildSticker.description`
+
+        :type: :class:`str`
+
+    .. attribute:: available
+
+        The availability of a sticker being changed.
+
+        See also :attr:`GuildSticker.available`
+
+        :type: :class:`bool`
+
+    .. attribute:: archived
+
+        The thread is now archived.
+
+        :type: :class:`bool`
+
+    .. attribute:: locked
+
+        The thread is being locked or unlocked.
+
+        :type: :class:`bool`
+
+    .. attribute:: auto_archive_duration
+
+        The thread's auto archive duration being changed.
+
+        See also :attr:`Thread.auto_archive_duration`
+
+        :type: :class:`int`
+
+    .. attribute:: default_auto_archive_duration
+
+        The default auto archive duration for newly created threads being changed.
+
+        :type: :class:`int`
 
 .. this is currently missing the following keys: reason and application_id
    I'm not sure how to about porting these
@@ -3011,6 +3549,14 @@ InteractionResponse
 .. autoclass:: InteractionResponse()
     :members:
 
+InteractionMessage
+~~~~~~~~~~~~~~~~~~~
+
+.. attributetable:: InteractionMessage
+
+.. autoclass:: InteractionMessage()
+    :members:
+
 Member
 ~~~~~~
 
@@ -3077,6 +3623,15 @@ RoleTags
 .. autoclass:: RoleTags()
     :members:
 
+PartialMessageable
+~~~~~~~~~~~~~~~~~~~~
+
+.. attributetable:: PartialMessageable
+
+.. autoclass:: PartialMessageable()
+    :members:
+    :inherited-members:
+
 TextChannel
 ~~~~~~~~~~~~
 
@@ -3092,6 +3647,30 @@ TextChannel
 
     .. automethod:: typing
         :async-with:
+
+Thread
+~~~~~~~~
+
+.. attributetable:: Thread
+
+.. autoclass:: Thread()
+    :members:
+    :inherited-members:
+    :exclude-members: history, typing
+
+    .. automethod:: history
+        :async-for:
+
+    .. automethod:: typing
+        :async-with:
+
+ThreadMember
+~~~~~~~~~~~~~
+
+.. attributetable:: ThreadMember
+
+.. autoclass:: ThreadMember()
+    :members:
 
 StoreChannel
 ~~~~~~~~~~~~~
@@ -3119,6 +3698,15 @@ StageChannel
 .. autoclass:: StageChannel()
     :members:
     :inherited-members:
+
+
+StageInstance
+~~~~~~~~~~~~~~
+
+.. attributetable:: StageInstance
+
+.. autoclass:: StageInstance()
+    :members:
 
 CategoryChannel
 ~~~~~~~~~~~~~~~~~
@@ -3218,12 +3806,44 @@ Widget
 .. autoclass:: Widget()
     :members:
 
+StickerPack
+~~~~~~~~~~~~~
+
+.. attributetable:: StickerPack
+
+.. autoclass:: StickerPack()
+    :members:
+
+StickerItem
+~~~~~~~~~~~~~
+
+.. attributetable:: StickerItem
+
+.. autoclass:: StickerItem()
+    :members:
+
 Sticker
 ~~~~~~~~~~~~~~~
 
 .. attributetable:: Sticker
 
 .. autoclass:: Sticker()
+    :members:
+
+StandardSticker
+~~~~~~~~~~~~~~~~
+
+.. attributetable:: StandardSticker
+
+.. autoclass:: StandardSticker()
+    :members:
+
+GuildSticker
+~~~~~~~~~~~~~
+
+.. attributetable:: GuildSticker
+
+.. autoclass:: GuildSticker()
     :members:
 
 RawMessageDeleteEvent
@@ -3274,6 +3894,14 @@ RawReactionClearEmojiEvent
 .. autoclass:: RawReactionClearEmojiEvent()
     :members:
 
+RawIntegrationDeleteEvent
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. attributetable:: RawIntegrationDeleteEvent
+
+.. autoclass:: RawIntegrationDeleteEvent()
+    :members:
+
 PartialWebhookGuild
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -3303,7 +3931,7 @@ most of these yourself, even if they can also be used to hold attributes.
 Nearly all classes here have :ref:`py:slots` defined which means that it is
 impossible to have dynamic attributes to the data classes.
 
-The only exception to this rule is :class:`abc.Snowflake`, which is made with
+The only exception to this rule is :class:`Object`, which is made with
 dynamic attributes in mind.
 
 
@@ -3517,6 +4145,17 @@ Button
 
 .. autofunction:: discord.ui.button
 
+Select
+~~~~~~~
+
+.. attributetable:: discord.ui.Select
+
+.. autoclass:: discord.ui.Select
+    :members:
+    :inherited-members:
+
+.. autofunction:: discord.ui.select
+
 
 Exceptions
 ------------
@@ -3550,6 +4189,8 @@ The following exceptions are thrown by the library.
 
 .. autoexception:: PrivilegedIntentsRequired
 
+.. autoexception:: InteractionResponded
+
 .. autoexception:: discord.opus.OpusError
 
 .. autoexception:: discord.opus.OpusNotLoaded
@@ -3567,6 +4208,7 @@ Exception Hierarchy
                 - :exc:`LoginFailure`
                 - :exc:`ConnectionClosed`
                 - :exc:`PrivilegedIntentsRequired`
+                - :exc:`InteractionResponded`
             - :exc:`NoMoreItems`
             - :exc:`GatewayNotFound`
             - :exc:`HTTPException`
